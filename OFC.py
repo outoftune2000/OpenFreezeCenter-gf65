@@ -10,6 +10,12 @@ from gi.repository import Gtk, GLib, Gdk
 EC_IO_FILE = '/sys/kernel/debug/ec/ec0/io'
 NOISE_TEXTURE_PATH = os.path.join(tempfile.gettempdir(), "ofc_fbm_noise.png")
 NOISE_PROFILE_PATH = os.path.join(os.path.realpath(os.path.dirname(__file__)), "noise_profile.json")
+WEBCAM_CONTROL_ADDRESS = 46
+WEBCAM_ON_VALUE = 75
+WEBCAM_OFF_VALUE = 73
+KEYBOARD_BACKLIGHT_ADDRESS = 243
+KEYBOARD_BACKLIGHT_MIN_VALUE = 128
+KEYBOARD_BACKLIGHT_MAX_VALUE = 131
 DEFAULT_NOISE_SETTINGS = {
     "image_width": 220,
     "image_height": 220,
@@ -222,6 +228,33 @@ def bct_selection(combobox):
     config.BATTERY_THRESHOLD_VALUE = int(value)
     write(0xe4, config.BATTERY_THRESHOLD_VALUE + 128)
     config_writer()
+
+def read_webcam_state():
+    try:
+        webcam_value = read(WEBCAM_CONTROL_ADDRESS, 1, 0)
+    except (OSError, ValueError):
+        return False
+    return webcam_value == WEBCAM_ON_VALUE
+
+def write_webcam_state(enabled):
+    write(WEBCAM_CONTROL_ADDRESS, WEBCAM_ON_VALUE if enabled else WEBCAM_OFF_VALUE)
+
+def clamp_keyboard_backlight_value(value):
+    try:
+        numeric_value = int(value)
+    except (TypeError, ValueError):
+        numeric_value = KEYBOARD_BACKLIGHT_MIN_VALUE
+    return max(KEYBOARD_BACKLIGHT_MIN_VALUE, min(KEYBOARD_BACKLIGHT_MAX_VALUE, numeric_value))
+
+def read_keyboard_backlight_value():
+    try:
+        backlight_value = read(KEYBOARD_BACKLIGHT_ADDRESS, 1, 0)
+    except (OSError, ValueError):
+        return KEYBOARD_BACKLIGHT_MIN_VALUE
+    return clamp_keyboard_backlight_value(backlight_value)
+
+def write_keyboard_backlight_value(value):
+    write(KEYBOARD_BACKLIGHT_ADDRESS, clamp_keyboard_backlight_value(value))
 
 def clamp_noise_settings(raw_settings):
     settings = dict(DEFAULT_NOISE_SETTINGS)
@@ -499,11 +532,15 @@ class ParentWindow(Gtk.Window):
         apply_class(self.main_shell, "app-shell")
         self.add(self.main_shell)
         self._reveal_sequence = []
+        self._syncing_webcam_switch = False
+        self._syncing_backlight_slider = False
 
         self._build_header()
         self._build_profile_panel()
         self._build_metrics_panel()
         self._build_battery_panel()
+        self._build_webcam_panel()
+        self._build_keyboard_backlight_panel()
         self._start_intro_animation()
 
         self.set_glass_mode(False)
@@ -796,6 +833,79 @@ class ParentWindow(Gtk.Window):
         panel.pack_end(self.bct_selector, False, False, 0)
 
         self._pack_with_revealer(panel, 230, Gtk.RevealerTransitionType.SLIDE_UP)
+
+    def _build_webcam_panel(self):
+        panel = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        apply_class(panel, "panel")
+        panel.pack_start(make_label("Webcam", "panel-title"), False, False, 0)
+
+        self.webcam_switch = Gtk.Switch()
+        self.webcam_switch.connect("notify::active", self._on_webcam_switch_changed)
+        self._set_webcam_switch_state(read_webcam_state())
+        panel.pack_end(self.webcam_switch, False, False, 0)
+
+        self._pack_with_revealer(panel, 290, Gtk.RevealerTransitionType.SLIDE_UP)
+
+    def _build_keyboard_backlight_panel(self):
+        panel = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        apply_class(panel, "panel")
+        panel.pack_start(make_label("Keyboard Backlight", "panel-title"), False, False, 0)
+
+        slider_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        slider_box.set_hexpand(True)
+        panel.pack_end(slider_box, True, True, 0)
+
+        self.backlight_scale = Gtk.Scale.new_with_range(
+            Gtk.Orientation.HORIZONTAL,
+            KEYBOARD_BACKLIGHT_MIN_VALUE,
+            KEYBOARD_BACKLIGHT_MAX_VALUE,
+            1,
+        )
+        self.backlight_scale.set_digits(0)
+        self.backlight_scale.set_draw_value(False)
+        self.backlight_scale.set_hexpand(True)
+        self.backlight_scale.add_mark(128, Gtk.PositionType.BOTTOM, "Off")
+        self.backlight_scale.add_mark(129, Gtk.PositionType.BOTTOM, "Low")
+        self.backlight_scale.add_mark(130, Gtk.PositionType.BOTTOM, "Med")
+        self.backlight_scale.add_mark(131, Gtk.PositionType.BOTTOM, "Max")
+        self.backlight_scale.connect("value-changed", self._on_backlight_slider_changed)
+        slider_box.pack_start(self.backlight_scale, True, True, 0)
+
+        self._set_backlight_slider_value(read_keyboard_backlight_value())
+        self._pack_with_revealer(panel, 350, Gtk.RevealerTransitionType.SLIDE_UP)
+
+    def _set_webcam_switch_state(self, enabled):
+        self._syncing_webcam_switch = True
+        try:
+            self.webcam_switch.set_active(enabled)
+        finally:
+            self._syncing_webcam_switch = False
+
+    def _set_backlight_slider_value(self, value):
+        self._syncing_backlight_slider = True
+        try:
+            clamped_value = clamp_keyboard_backlight_value(value)
+            self.backlight_scale.set_value(clamped_value)
+        finally:
+            self._syncing_backlight_slider = False
+
+    def _on_webcam_switch_changed(self, switch, _):
+        if self._syncing_webcam_switch:
+            return
+        try:
+            write_webcam_state(switch.get_active())
+        except OSError:
+            self._set_webcam_switch_state(read_webcam_state())
+
+    def _on_backlight_slider_changed(self, scale):
+        if self._syncing_backlight_slider:
+            return
+        requested_value = int(round(scale.get_value()))
+        try:
+            write_keyboard_backlight_value(requested_value)
+            self._set_backlight_slider_value(requested_value)
+        except OSError:
+            self._set_backlight_slider_value(read_keyboard_backlight_value())
 
     def _pack_with_revealer(self, widget, delay_ms, transition_type, expand=False, fill=False):
         revealer = Gtk.Revealer()
