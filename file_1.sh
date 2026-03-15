@@ -1,15 +1,14 @@
-#!/usr/bin/expect -f
+#!/bin/bash
 
-spawn nano /etc/modprobe.d/ec_sys.conf
-send "\noptions ec_sys write_support=1\n"
-send "\x1B"         ;# Escape key
-send "\x13"         ;# Ctrl+S
-send "\x0D"         ;# Enter
-send "\x18"         ;# Ctrl+X
-expect {
-    "Save modified buffer*" { send "Y\r" }
-    eof
-}
-send "\x0D"         ;# Enter
-send "\x1B"         ;# Escape key
-expect eof
+CONF="/etc/modprobe.d/ec_sys.conf"
+
+echo "Enabling EC write support..."
+
+sudo mkdir -p /etc/modprobe.d
+
+if grep -q "^options ec_sys write_support=1$" "$CONF" 2>/dev/null; then
+    echo "EC write support already enabled."
+else
+    echo "options ec_sys write_support=1" | sudo tee -a "$CONF" > /dev/null
+    echo "EC write support enabled."
+fi
