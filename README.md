@@ -46,27 +46,8 @@ cd ~/Desktop/OFC
 ./install.sh
 ```
 
-## Noise Tuning Utility
-
-Use the noise tuning utility to tweak procedural glass/noise parameters with live sliders and preview:
-
-```bash
-cd ~/Desktop/OFC
-python noise_tuner.py
-```
-
-When you click `Save Profile`, values are written to:
-
-`~/Desktop/OFC/noise_profile.json`
-
-`OFC.py` reads this file automatically when generating the glass noise texture.
-
-For a grainy blur look, tune these first:
-- `Blur Radius`: how soft the base blur texture is
-- `Grain Amount`: how much original grain detail is mixed back into that blur
-
 ## Supported Hardware (tested)
-- MSI GP76 11UG
+- MSI GF65 10UE
 
 ## Supported Linux Distro (tested)
 - Arch-based distros (current installer uses `pacman`)
