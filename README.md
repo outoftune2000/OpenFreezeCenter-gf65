@@ -5,6 +5,10 @@ OpenFreezeCenter-gf65 is a Linux GUI utility for controlling MSI laptop fan beha
 If you do not want to run the GUI, try OpenFreezeCenter-Lite (CLI):
 https://github.com/YoCodingMonster/OpenFreezeCenter-Lite
 
+## Tools 
+This tool was used to observe the EC register values in order to add these features  
+https://github.com/outoftune2000/MSI-ec-observ/tree/main 
+
 ## Features
 - Fan profile selection: `Auto`, `Basic`, `Advanced`, `Cooler Booster`
 - CPU/GPU temperature monitoring (current/min/max)
