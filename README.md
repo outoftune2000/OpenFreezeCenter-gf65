@@ -1,6 +1,6 @@
 # OpenFreezeCenter (OFC)
 
-OpenFreezeCenter is a Linux GUI utility for controlling MSI laptop fan behavior and battery charge threshold through EC (embedded controller) access.
+OpenFreezeCenter-gf65 is a Linux GUI utility for controlling MSI laptop fan behavior and battery charge threshold through EC (embedded controller) access (this repo is specific to the model GF65 Thin 10UE . Other models are not tested and functionality cannot be guarenteed . Use at your own risk ).
 
 If you do not want to run the GUI, try OpenFreezeCenter-Lite (CLI):
 https://github.com/YoCodingMonster/OpenFreezeCenter-Lite
@@ -65,6 +65,7 @@ Example:
 ## Project Goals
 - [x] Fan control GUI
 - [x] Basic temperature and RPM monitoring
-- [ ] Advanced and basic GUI control improvements
+- [x] Advanced and basic GUI control improvements
 - [x] Battery threshold
-- [ ] Webcam control
+- [x] Webcam control
+- [x] Keyboard backlight controls in the GUI 
